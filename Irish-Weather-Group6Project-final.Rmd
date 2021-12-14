@@ -1,0 +1,669 @@
+---
+title: "ST661-Group6-Project"
+author: "Harsha-Madhu-Priyank-Sardar"
+output:
+  html_document:
+    code_folding: hide
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width = 11, fig.height = 8)
+```
+
+## Irish-Weather Dataset-2017 year Analysis{.tabset}
+
+This work is produced for academic purposes only.
+
+This report considered the Irish Weather Data from Ireland's Weather Observing Stations in 2017 and includes energy generation data for 2017 in the Tibble eirgrid17.
+
+Copyright is associated with Met Éireann and EirGrid.
+
+The Source of the dataset used in this report are fetched from www.met.ie, http://www.eirgridgroup.com/how-the-grid-works/renewables/
+
+This data is published under a Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Met Éireann does not accept any liability whatsoever for any error or omission in the data, their availability, or for any loss or damage arising from their use.
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+### Project Background Information
+
+The following is the introduction of the Dataset:
+
+aimsir17: Irish Weather Observing Stations Hourly Records for 2017
+
+Named after the Irish name for weather, this package contains tidied data from the Irish Meteorological Service's hourly observations for 2017. In all, the data sets include observations from 25 weather stations, and its latitude and longitude coordinates for each weather station. Also, it includes energy generation data for Ireland and Northern Ireland (2017), including Wind Generation data.
+
+There are three datasets in this package. 
+
+* eirgrid17 - Description:
+              EirGrid System Data Quarterly Hourly for 2017
+
+* observations - Description: 
+                             Weather Observing Stations Records 01-Jan-2017 to 31-Dec-2017
+
+* stations - Description:
+             Summary of the weather observing stations with observations
+
+We will look at a few specific events and derive insights from the given data sets to know more about Ireland's weather in the year 2017.
+
+The data sets contain observations from 25 weather stations positioned across Ireland, with their Latitude and longitude coordinates for each weather station. It stores the hourly records from January-December based on the following weather observation stations. They have used the Irish Meteorological Service to collect the data sets from stations placed across Ireland.
+
+We have merged the different datasets into one using "stations" as the common column, where the newly generated single dataset has column values of both data sets.
+
+There were less than 0.1% duplicates present in the given dataset and similarly, there were ~ 1% of NAs in the data.frame named “observations”. We handled it by performing certain data cleaning activities. The variables found to have the appropriate type and the structure of the data sets were aligned with the project, not requiring any kind of data manipulation activities.
+
+
+**Packages Required**
+
+```{r}
+# Loading libraries into our Notebook
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(aimsir17)
+library(ggplot2)
+library(hrbrthemes)
+library(GGally)
+library(lubridate)
+library(xts)
+library(dplyr)
+library(dygraphs)
+```
+
+### Data Cleaning and Preparation 
+
+```{r}
+# Looking out for NA's
+print(mean(is.na(observations))*100) # Total percentage of NA's in Observations
+
+print(mean(is.na(stations))*100) # Total percentage of NA's in Stations
+```
+
+**Variable selection and data merging**
+
+```{r}
+# Generating new data.frame by merging OS and stations data into one data.frame
+os<- merge(observations, stations, by="station")
+
+# Checking for NA's
+mean(is.na(os))*100
+# Assigning 0 in the place for NA
+os[is.na(os)] = 0
+mean(is.na(os))*100
+
+head(os)
+```
+
+
+### Data Summary
+
+We have three data sets. 1) Observations 2) Stations 3) Eirgrid
+
+```{r}
+head(os)
+```
+
+
+```{r}
+glimpse(os)
+```
+The following variables are recored for each observation:
+
+* station (weather station name)
+* year (2017)
+* month (month of year 1-12)
+* day (day of month 1-31)
+* date (date object in R)
+* rain (hourly rainfall in mm)
+* temp (hourly temperature in C)
+* rhum (Relative Humidity - percent)
+* msl (Mean Sea Level Pressure - hPa)
+* wdsp (Mean Wind Speed - knots)
+* wddir (Predominant Wind Direction - degree)
+
+```{r}
+summary(os)
+```
+
+```{r}
+head(stations)
+```
+
+
+```{r}
+glimpse(stations)
+```
+
+The following variables are recored for each stations:
+
+* station (weather station name)
+* County (The county location of the station)
+* Height (Height of the stations)
+* Longitude and Latitude (The exact locaiton of the stations)
+
+```{r}
+summary(stations)
+```
+
+```{r}
+head(eirgrid17)
+```
+
+```{r}
+glimpse(eirgrid17)
+```
+The following variables are recorded for each eirgrid17:
+
+* year (2017)
+* month (month of year 1-12)
+* day (day of month 1-31)
+* hour (hour of the day)
+* date (date object in R)
+* NIGeneration (Northern Ireland energy generation)
+* NIDemand (Northern Ireland energy demand)
+* NIWindAvailability (Northern Ireland Wind Availability)
+* NIWindGeneration (Northern Ireland Wind Generation)
+* IEGeneration (Ireland energy generation)
+* IEDemand (Ireland enegry Demand)
+* IEWindavailablitiy (Ireland Wind Availability)
+* IEWindGeneration (Ireland Wind Generation)
+* SNSP (System Non-Synchronous Penetration, it is a real-time measure of the percentage of generation that comes from non-synchronous sources)
+
+```{r}
+summary(eirgrid17)
+```
+
+### Rainfall Analysis
+
+**Maximum Rainy months**
+
+Let’s look at the months with maximum rainfall in 2017. This will help us understand which month have high possibility to rain. 
+
+```{r}
+# Max Rainy months, with an index value where 100 is the wettest
+os %>% 
+  group_by(month.name[month]) %>%
+  summarise(rainMonth=sum(rain)) %>%
+  arrange(rainMonth) %>%
+  mutate(Index=100*rainMonth/max(rainMonth)) %>%
+  print(n=25)
+#Observation: September has the highest rainfall, as seen above.
+```
+
+
+**Rainfall/Month** including date time 
+
+Let’s look at the months with maximum rainfall in 2017. This will help us understand which month have high possibility to rain. 
+
+```{r}
+dateto <- ymd_hms(os$date)
+don <- xts(x = os$rain, order.by = dateto)
+dygraph(don) %>%
+  dyOptions(labelsUTC = TRUE, fillGraph=TRUE, fillAlpha=0.1, drawGrid = FALSE, colors="#D8AE5A") %>%
+  dyRangeSelector() %>%
+  dyCrosshair(direction = "vertical") %>%
+  dyHighlight(highlightCircleSize = 5, highlightSeriesBackgroundAlpha = 0.2, hideOnMouseOut = FALSE)  %>%
+  dyRoller(rollPeriod = 1)
+```
+
+
+### Temperature Analysis
+
+
+**Temperature/Month**
+
+Let’s look at the temperature months wise such as maximum,minimum,mean . This will help us understand temperature of each month and to identify the seasons. 
+
+```{r}
+ggplot(os,aes(x = month.name[month],y = temp)) + 
+  geom_point(aes(colour = temp)) +
+  scale_colour_gradient2(low = "blue", mid = "green" , high = "red", midpoint = 16) + 
+  geom_smooth(color = "red",size = 1) +
+  scale_y_continuous(limits = c(5,30), breaks = seq(5,30,5)) +
+  ggtitle ("Daily average temperature") +
+  xlab("Date") +  ylab ("Average Temperature ( ºC )")
+
+#observation:
+#Winter  - November, December, January [which had the lowest temperature]
+#Summer  - May, June, July [Which had highest temperature]
+
+```
+
+** Hourly average temperature ** 
+
+Let’s look at the average temperature hour wise such . This will help us understand temperature of each hour in a month
+
+```{r}
+ourly_mean<- os %>%
+group_by(month,date,hour) %>%
+summarize(tem_avg = mean(temp))
+ourly_mean
+
+zzZ <- ggplot(ourly_mean,aes(x = hour,y = tem_avg)) +
+  geom_point(colour = "#FF66FF" ,size = 0.05) +
+  geom_smooth(colour = "#66CCFF",size = 0.25) +
+  scale_y_continuous(limits = c(5,23)) +
+  ggtitle ("Hourly average temperature") +
+  xlab("Hour") +  ylab ("Average Temperature ( ºC )")
+          
+
+# create faceted panel
+zzZ + facet_wrap(~month.name[month])
+
+#observations:
+#There is a significant rise and fall in temperature for  few month like august may june july september 
+#During the months of december january february november october the temperature remanins constant within a range 
+```
+
+
+
+
+
+**Total-Min-Max of Rain,Temperature**
+
+Let’s look at the temperature months wise such as maximum,minimum,mean . This will help us understand temperature of each month and to identify the seasons.
+
+```{r}
+#Total min max rain,temperature
+max_min <- os %>% 
+  group_by(month=month.name[month]) %>%
+  summarise(min_temp=min(temp,na.rm = T),
+            max_temp=max(temp,na.rm = T),
+            Mean_temp=mean(temp,na.rm = T),
+            min_rain=min(rain,na.rm = T),
+            Max_Rain=mean(rain,na.rm = T))
+
+max_min
+
+#observation:
+#Minimum temperature month:December
+#Maximum temperature month:June
+#Maximum Rainy month:September
+```
+
+
+**Annual mean rainfall,temperature**
+
+Let’s look at the temperature,rainfall annualy.This will help us understand amount of rainfall and degree of temperature per year.Which will help to detect the annual report 
+
+```{r}
+#Annual mean rainfall
+mean( os$rain, FUN=sum, na.rm=TRUE) 
+
+#Annual mean temperature
+mean( os$temp, FUN=sum, na.rm=TRUE)
+ 
+#observation:
+#Annual mean temperature in the year 2017 in Ireland is 10.290
+#Annual rainfall in Ireland during 2017 is 0.122
+```
+
+
+### Humidity Analysis
+
+**Correlation between humidity and rain**
+
+Let’s look at the humidity when there is rainfall in 2017. This will help us predict the possibility to rain according to the humidity.
+
+```{r}
+# Filtering out the Dublin Airport data
+DUBLIN_AIRPORT<- filter(os, os$station == "DUBLIN AIRPORT")
+head(DUBLIN_AIRPORT)
+
+# H0 = Rain increases as rhum rises
+# HA != Rain does not increases as rhum rises
+# A basic scatter plot with color depending on the Temperature
+ggplot(DUBLIN_AIRPORT, aes(y=rain, x=rhum, color=temp)) + 
+  geom_point(size=6) +
+  ggtitle ("Rain vs Rhum fr Dublin Airport") +
+  xlab("Rhum") +  ylab ("Rain")
+```
+
+**Correlation between humidity and temperature**
+
+Let’s look at the temperature when there is rainfall in 2017. This will help us predict the possibility to rain according to the humidity.
+
+```{r}
+# H0 = Rhum falls as Temp rises
+# HA != Rhum does not falls as Temp rises
+# It proves H0.
+ggplot(DUBLIN_AIRPORT, aes(x=temp, y=rhum, color=temp)) + 
+  geom_point(size=6) +
+  theme_ipsum()+
+  ggtitle ("Temperature vs Rhum fr Dublin Airport") +
+  xlab("Temperature") +  ylab ("Rhum")
+
+#observation:humidity decreases as temperature increases
+```
+
+
+### Station-wise Analysis
+
+
+**Rainfall per stations **
+
+Let’s look at the heighest peak station which help us to understand whether the rainfall is corelated with the height above sea level.
+# The weather stations from driest to wettest, with an index value where 100 is the wettest
+# As we can see that the Newport is the wettest station.
+```{r}
+
+h<-os %>% 
+  group_by(station) %>%
+  summarise(TotalRainfall=sum(rain,na.rm = T)) %>%
+  arrange(desc(TotalRainfall)) %>%
+  mutate(Index=100*TotalRainfall/max(TotalRainfall)) %>%
+  print(n=25)
+
+```
+
+**Highest peak station**
+
+```{r}
+Heighest_station <- stations %>% arrange(desc(height)) %>% 
+  slice(1:4) %>% 
+  pull(station) %>%
+  unique()
+Heighest_station
+ggplot(filter(stations,station %in% Heighest_station),aes(x=height,y=station,colour=station))+
+geom_bar(stat="identity")+geom_line()
+ggplot(os,aes(y=station,x=height,colour=station))+
+  geom_bar(stat="identity")+geom_line()
+
+```
+
+
+**Newport -> Individual Station-wise Analysis**
+
+**Working on the New Port Station, I have took data based on the station NEWPORT for further Station-wise Analysis.**
+```{r}
+# Working on the New Port Station
+new_port<- filter(os, os$station == "NEWPORT")
+```
+
+**visualization of correlations**
+
+**The correlation graph shows correlation present between different paramters of Corr**
+```{r}
+library(GGally)
+
+# visualization of correlations
+ggcorr(new_port, method = c("everything", "pearson"))
+```
+
+**Wetties month for NewPort throughout the year 2017**
+
+**From This graph we can see that as the temperature rises (blocks in dark blue) the rain also rises, and vice versa.**
+```{r}
+# 
+ggplot(new_port, aes(x=month, y=rain, fill=month, label=temp)) +
+  geom_raster()+
+  ggtitle ("Temperature vs R-Humiditity for NEWPORT Station") +
+  xlab("Temperature") +  ylab ("Rhum")
+```
+
+
+**A basic scatter plot with color depending on Temperature**
+```{r}
+# A basic scatter plot with color depending on Temperature
+ggplot(new_port, aes(x=wdsp, y=rain, color=temp)) + 
+  geom_point(size=6) +
+  theme_ipsum()+
+  ggtitle ("Wind Speed vs Rain for NEWPORT Station") +
+  xlab("Wind Speed") +  ylab ("Rain")
+```
+
+**Showing the Temperature and the Rain for New_Port**
+```{r}
+# Showing the Area and the Contour
+ggplot(new_port, aes(x=temp, y=rain) ) +
+  stat_density_2d(aes(fill = ..level..), geom = "polygon", colour="white")+
+  ggtitle ("Temperature vs R-Humiditity levels of NEWPORT Station") +
+  xlab("Temperature") +  ylab ("Rhum")
+```
+
+
+### Weather-Events
+
+*Joining the data sets to perform analysis*
+
+```{r}
+data_set_prep <- full_join( os, stations, by = "station")
+```
+
+```{r}
+data_set <- rename(data_set_prep, station_county = county.y , station_height = height.y , station_latitude = latitude.y, station_longitude = longitude.y )
+head(data_set)
+```
+
+**Weather Events**
+
+Earth is a dynamic planet that changes daily. Weather patterns and events are a tremendous part of that change. While these patterns and events are necessary for our planet to continue to be life-sustaining, they can also cause substantial damage and sometimes cost billions of dollars in repair and rescue efforts.
+
+Weather phenomena can be defined as natural events that occur as a result of one or a combination of the water cycle, pressure systems and the Coriolis effect. They often involve or are related to precipitation, wind or heat.
+
+One such significant weather event found in 2017 was Storm Ophelia. 
+
+**Coldest and Warmest County in Ireland**
+
+```{r}
+c_temp1 <- aggregate(temp ~ station_county, data = data_set, mean)
+c_temp1
+# Westmeath is coldest county - when average temperature is considered
+# Kerry is the warmest county - when average temperature is considered
+```
+
+In 2017, the record high and record low temperature was noticed in which respective county:
+
+```{r}
+Record_low <- aggregate(temp ~ station_county, data = data_set, min)
+Record_low
+# Record low temperature was in Dublin County - considering the average temperature
+```
+
+```{r}
+Record_high <- aggregate(temp ~ station_county, data = data_set, max)
+Record_high
+# Record high temperature was in Dublin County - considering the average temperature
+```
+
+Heat map view of the County-Temperature-Monthly
+
+```{r}
+ggplot(data_set, aes(x = month, y = station_county, fill = temp)) +
+  geom_tile() + scale_fill_gradient(low="blue", high="red") +
+  ggtitle ("Temperature wise station_Counties for each month - Tile ") +
+  xlab("Month") +  ylab ("Station_County")
+```
+
+**Storm Ophelia**
+
+On October 16th 2017, Storm Ophelia landed in Ireland. We will analyse this data.
+ 
+```{r}
+Ophelia_storm <- os %>%
+  filter(month==10, day==16)
+head(Ophelia_storm)
+```
+
+```{r}
+Record_high_temp_ophelia <- aggregate(temp ~ county, data = Ophelia_storm, max)
+Record_high_temp_ophelia
+#Highest temp was recorded in Kerry
+```
+
+```{r}
+Record_high_rhum_ophelia <- aggregate(rhum ~ county, data = Ophelia_storm, max)
+Record_high_rhum_ophelia
+#Highest Hum was recorded in Dublin and Cork
+```
+
+```{r}
+Record_high_msl_ophelia <- aggregate(msl ~ county, data = Ophelia_storm, max)
+Record_high_msl_ophelia
+#Highest MSL was recorded in Donegal
+```
+
+```{r}
+Record_high_rain_ophelia <- aggregate(rain ~ county, data = Ophelia_storm, max)
+Record_high_rain_ophelia
+#Highest Rain was recorded in Kerry
+```
+
+One of the factors influenced by storms is Atmospheric Pressure. Now, we will try to find out the stations that has the lowest atmospheric pressure.
+
+```{r}
+lowest_atm_stations <- Ophelia_storm %>% arrange(msl) %>% 
+  slice(1:2) %>% 
+  pull(station) %>%
+  unique()
+lowest_atm_stations
+```
+
+Plotting it in graph
+
+```{r}
+ggplot(filter(Ophelia_storm,station %in% lowest_atm_stations),aes(x=date,y=msl,colour=station))+
+  geom_bar(stat="identity")+
+  ggtitle ("Bar Graph for Ophelia Storm and Lowest Atmospheric Stations") +
+  xlab("Date") +  ylab ("Minimum Sea Level")
+```
+
+Another factor influenced by a storm is Wind speed. Now, we wil try to find the stations where the mean hourly wind speed was highest on the given date.
+
+```{r}
+highest_wdsp_station<- Ophelia_storm %>% arrange(desc(wdsp)) %>% 
+  slice(1:3) %>% 
+  pull(station) %>%
+  unique()
+highest_wdsp_station
+```
+
+```{r}
+ggplot(filter(Ophelia_storm,station %in% highest_wdsp_station),aes(x=date,y=wdsp,colour=station)) +
+ geom_area()
+```
+
+### Energy Data
+
+The energy demand per month can be viewed
+
+```{r}
+ggplot(eirgrid17,aes(x=date,y=IEDemand, colour=month))+geom_point()+geom_line()
+```
+
+The wind power generated for a month can be viewed
+
+```{r}
+ggplot(eirgrid17,aes(x=date,y=IEWindGeneration))+geom_point()+geom_line()
+```
+
+We can join the observations and eirgrid17 data sets to perform further analysis to find relations between wind power and energy generated and other relevant insights.
+
+```{r}
+new_dataset <- full_join(eirgrid17, os, by = c("year", "month", "day", "hour"))
+new_dataset
+```
+
+Energy generated with respect to the wind speed
+
+```{r}
+energy_wind <- aggregate(IEGeneration ~ wdsp, data = new_dataset, sum) 
+ggplot(energy_wind,aes(IEGeneration, wdsp)) + geom_point() + geom_line()
+```
+
+Looking for relationship between average hourly wind speed and average wind power generated.
+
+```{r}
+months <- new_dataset %>% 
+                        group_by(county,wdsp,year,month,day,hour) %>%
+                        summarise(AvrEnergyHourWind=mean(IEWindGeneration))
+months
+```
+
+
+```{r}
+ggplot(months,aes(x=wdsp,y=AvrEnergyHourWind,colour=county))+geom_point()+geom_jitter()+geom_smooth()
+```
+
+IE Wind Generation in each county with respective wind speed
+
+```{r}
+ggplot(new_dataset,aes(x=wdsp,y=IEWindGeneration,colour=county))+geom_point()+geom_jitter()+geom_smooth()
+```
+
+The energy demand per hour/day/month in 2017
+
+```{r}
+energy_demand <- eirgrid17 %>% 
+            mutate(DoW=wday(date,label = T),
+                   Month=month(date,label=T)) %>%
+            group_by(DoW,hour,Month) %>%
+            summarise(Max_Energy_Demand=max(IEDemand)) %>%
+            ungroup() %>%
+            mutate(DoW=factor(DoW,
+                              levels = c("Mon","Tue", "Wed","Thu","Fri","Sat","Sun")))
+```
+
+The energy demand for each month in 2017
+
+```{r}
+ggplot(energy_demand, aes(hour, DoW)) +
+ geom_tile(aes(fill = Max_Energy_Demand))+scale_fill_gradientn(colours = c("lightblue", "red"))+facet_wrap(~Month,ncol=4)
+```
+
+The energy demand during the Ophelia storm
+
+```{r}
+Ophelia_storm_nd <- new_dataset %>%
+  filter(month==10, day==16)
+Ophelia_storm_nd
+```
+
+```{r}
+ggplot(Ophelia_storm_nd,aes(hour, IEDemand)) + geom_point() + geom_line()
+```
+
+### Summary
+
+Exploratory data analysis was performed on the three data sets and following conclusions were made.
+
+We have used all three datasets avaialble in the 'aimsir17' package, after performing certain data cleaming and data preparations we looked  for the rainy month and the mosst wettiest station. 
+Similarly we explored hourly and monthly temperature analysis by which we get to know the increase in temperature in certain period of the year. Likewise, the Humidity Analysis depict us how the rain and Humidity levels are interconnected.
+On the other hand, the Station-wise analysis represents the total rainfall as per each station, here, we have worked on the New-Port station here, as it is the most rainy station overall. In this analysis we discovered the following explorations.
+
+* From our observation, we can conclude that humidity and rain are directly proportional and on the other hand humidity and temperature are inversely proportional.
+* Wettest months in Ireland are usually December and January but in 2017, by using our data set we can interpret that September has recorded the highest rainfall. 
+* The west coast of Ireland receives more rainfall than the east coast and this is due to the wind blows from the southwest breaking on the mountains of the west.
+* From the data sets we have observed that energy demand rises when the temperature falls.
+
+Likewise, Weather events analysis projects certain aspects about overall significant events happened throughout the year over each Station_County, which includes data of the Ophelia storm happened during October month. 
+Finally, the Energy outlook represents the overall energy demand and generation in the Republic of Ireland through out the year, this shows us the pecuilar details i.e. low temperature demands high energy.
+
+By working on the 'aimsir17' dataset we gained knowledge about how complex and detailed the atmospheric data can become. After working on it we grasped and enhanced our knowledge regarding the natural phenomenas.
+
+After the analysis of the data we found: 
+
+* As the temperature falls, the energy demand rises. More energy resources will be needed for heating purposes, mainly in the winter season, more energy (in particular, electricity) will be needed to run heating devices.
+* There is a strong correlation between rain and humidity parameters shown in the data set.
+* Temperature and humidity are inversely proportionate.
+
+**Limitations and Challenges**
+
+The challenges we faced were more in terms of aggregating the data sets based on different parameters and making sure the joined data set is producing relevant outputs. This report lacks the forecasting of weather as it requires expertise to analyze to forecast the weather some level of expertise is required to analyze the data that comes through it.
+
+The limitations of the data sets were
+* Lack of Previous Data for Comparisons: There are no data on the previous years weather in the study which limits the use of the data for the purposes of predicting or forecasting. It is therefore not possible to estimate reliably the next occurrences of rain, cold or warm weather. 
+* The estimates can be wrong: The estimates obtained from weather radar are not 100 percent accurate. This means that the data may be wrong in some cases and this may impact the fial decision making.
+* More interference: Radar technology experiences interference from various aspects of the weather including water, wind, and so on. This may affect the quality of the data and hence the results of the analysis.
+* Cannot detect fog: Weather radar has the limitation of not being able to detect fog.
+
+**Area of responsibility **
+
+* I, Sardar yousaf saleem, had primary responsibility for the data cleaning, merging and humidity analysis.
+* I, Madhushree Saravanan, had primary responsibility for the temperature analysis , ranifall analysis and station analysis.
+* I, Harsha Teja N, had primary responsibility for the weather events, subset of station analysis and energy data analysis.
+* I, Priyank, had primary responsibility for the data analysis , energy data analysis, subsets of summary and conclusions.
+
+
